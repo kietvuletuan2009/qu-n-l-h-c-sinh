@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Điểm Danh Học Sinh</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen">
+    <div class="max-w-7xl mx-auto p-6">
+        <!-- Header -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-600 p-3 rounded-lg">
+                        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">Quản Lý Điểm Danh</h1>
+                        <p class="text-sm text-gray-500">Hệ thống quản lý học sinh</p>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button onclick="switchView('attendance')" id="btn-attendance" class="px-4 py-2 rounded-lg font-medium bg-indigo-600 text-white">
+                        Điểm Danh
+                    </button>
+                    <button onclick="switchView('students')" id="btn-students" class="px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700">
+                        Học Sinh
+                    </button>
+                    <button onclick="switchView('stats')" id="btn-stats" class="px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700">
+                        Thống Kê
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance View -->
+        <div id="view-attendance" class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center justify-between gap-4 mb-6 flex-wrap">
+                <div class="flex items-center gap-4">
+                    <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <input type="date" id="attendance-date" class="px-4 py-2 border-2 border-gray-300 rounded-lg">
+                </div>
+                <button onclick="exportCSV()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    📥 Xuất Excel
+                </button>
+            </div>
+            <div id="attendance-list"></div>
+        </div>
+
+        <!-- Students View -->
+        <div id="view-students" class="bg-white rounded-xl shadow-lg p-6 hidden">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold">Danh Sách Học Sinh</h2>
+                <button onclick="toggleAddForm()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">
+                    ➕ Thêm
+                </button>
+            </div>
+
+            <div id="add-form" class="bg-indigo-50 p-4 rounded-lg mb-6 hidden">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <input type="text" id="student-id" placeholder="MSSV" class="px-3 py-2 border rounded-lg">
+                    <input type="text" id="student-name" placeholder="Họ tên" class="px-3 py-2 border rounded-lg">
+                    <input type="text" id="student-class" placeholder="Lớp" class="px-3 py-2 border rounded-lg">
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="addStudent()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">Thêm</button>
+                    <button onclick="toggleAddForm()" class="px-4 py-2 bg-gray-200 rounded-lg">Hủy</button>
+                </div>
+            </div>
+
+            <div id="students-list"></div>
+        </div>
+
+        <!-- Stats View -->
+        <div id="view-stats" class="bg-white rounded-xl shadow-lg p-6 hidden">
+            <h2 class="text-xl font-bold mb-6">Thống Kê Điểm Danh</h2>
+            <div id="stats-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // Data storage
+        let students = JSON.parse(localStorage.getItem('students') || '[]');
+        let records = JSON.parse(localStorage.getItem('records') || '[]');
+        let currentView = 'attendance';
+
+        // Initialize
+        document.getElementById('attendance-date').valueAsDate = new Date();
+        renderAll();
+
+        function saveData() {
+            localStorage.setItem('students', JSON.stringify(students));
+            localStorage.setItem('records', JSON.stringify(records));
+        }
+
+        function switchView(view) {
+            currentView = view;
+            document.getElementById('view-attendance').classList.add('hidden');
+            document.getElementById('view-students').classList.add('hidden');
+            document.getElementById('view-stats').classList.add('hidden');
+            document.getElementById('view-' + view).classList.remove('hidden');
+
+            ['attendance', 'students', 'stats'].forEach(v => {
+                const btn = document.getElementById('btn-' + v);
+                if (v === view) {
+                    btn.className = 'px-4 py-2 rounded-lg font-medium bg-indigo-600 text-white';
+                } else {
+                    btn.className = 'px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700';
+                }
+            });
+
+            renderAll();
+        }
+
+        function toggleAddForm() {
+            document.getElementById('add-form').classList.toggle('hidden');
+        }
+
+        function addStudent() {
+            const id = document.getElementById('student-id').value.trim();
+            const name = document.getElementById('student-name').value.trim();
+            const cls = document.getElementById('student-class').value.trim();
+
+            if (!id || !name) {
+                alert('Vui lòng nhập MSSV và Họ tên!');
+                return;
+            }
+
+            students.push({
+                uid: Date.now().toString(),
+                id: id,
+                name: name,
+                class: cls
+            });
+
+            saveData();
+            document.getElementById('student-id').value = '';
+            document.getElementById('student-name').value = '';
+            document.getElementById('student-class').value = '';
+            toggleAddForm();
+            renderAll();
+        }
+
+        function deleteStudent(uid) {
+            if (confirm('Bạn có chắc muốn xóa học sinh này?')) {
+                students = students.filter(s => s.uid !== uid);
+                saveData();
+                renderAll();
+            }
+        }
+
+        function markAttendance(uid, status) {
+            const date = document.getElementById('attendance-date').value;
+            records = records.filter(r => !(r.uid === uid && r.date === date));
+            records.push({
+                uid: uid,
+                date: date,
+                status: status,
+                time: new Date().toISOString()
+            });
+            saveData();
+            renderAll();
+        }
+
+        function getStatus(uid, date) {
+            const rec = records.find(r => r.uid === uid && r.date === date);
+            return rec ? rec.status : null;
+        }
+
+        function getStats(uid) {
+            const studentRecs = records.filter(r => r.uid === uid);
+            const present = studentRecs.filter(r => r.status === 'present').length;
+            const absent = studentRecs.filter(r => r.status === 'absent').length;
+            const late = studentRecs.filter(r => r.status === 'late').length;
+            const total = studentRecs.length;
+            const rate = total > 0 ? ((present + late * 0.5) / total * 100).toFixed(1) : 0;
+            return { present, absent, late, total, rate };
+        }
+
+        function renderAttendance() {
+            const date = document.getElementById('attendance-date').value;
+            const container = document.getElementById('attendance-list');
+
+            if (students.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 text-gray-500">
+                        <p class="text-lg">Chưa có học sinh. Thêm học sinh để bắt đầu!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="px-4 py-3 text-left">MSSV</th>
+                            <th class="px-4 py-3 text-left">Họ Tên</th>
+                            <th class="px-4 py-3 text-left">Lớp</th>
+                            <th class="px-4 py-3 text-center">Trạng Thái</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            students.forEach((s, i) => {
+                const status = getStatus(s.uid, date);
+                const bgClass = i % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                
+                html += `
+                    <tr class="${bgClass}">
+                        <td class="px-4 py-3">${s.id}</td>
+                        <td class="px-4 py-3 font-medium">${s.name}</td>
+                        <td class="px-4 py-3">${s.class}</td>
+                        <td class="px-4 py-3">
+                            <div class="flex justify-center gap-2 flex-wrap">
+                                <button onclick="markAttendance('${s.uid}', 'present')" 
+                                    class="px-3 py-1 rounded-lg text-sm ${status === 'present' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700'}">
+                                    ✓ Có mặt
+                                </button>
+                                <button onclick="markAttendance('${s.uid}', 'late')" 
+                                    class="px-3 py-1 rounded-lg text-sm ${status === 'late' ? 'bg-yellow-600 text-white' : 'bg-yellow-100 text-yellow-700'}">
+                                    ⏰ Muộn
+                                </button>
+                                <button onclick="markAttendance('${s.uid}', 'absent')" 
+                                    class="px-3 py-1 rounded-lg text-sm ${status === 'absent' ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700'}">
+                                    ✗ Vắng
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function renderStudents() {
+            const container = document.getElementById('students-list');
+
+            if (students.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-12">Chưa có học sinh</p>';
+                return;
+            }
+
+            let html = `
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="px-4 py-3 text-left">MSSV</th>
+                            <th class="px-4 py-3 text-left">Họ Tên</th>
+                            <th class="px-4 py-3 text-left">Lớp</th>
+                            <th class="px-4 py-3 text-center">Thao Tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            students.forEach((s, i) => {
+                const bgClass = i % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                html += `
+                    <tr class="${bgClass}">
+                        <td class="px-4 py-3">${s.id}</td>
+                        <td class="px-4 py-3">${s.name}</td>
+                        <td class="px-4 py-3">${s.class}</td>
+                        <td class="px-4 py-3 text-center">
+                            <button onclick="deleteStudent('${s.uid}')" class="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200">
+                                🗑️ Xóa
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function renderStats() {
+            const container = document.getElementById('stats-list');
+
+            if (students.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-12">Chưa có dữ liệu</p>';
+                return;
+            }
+
+            let html = `
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="px-4 py-3 text-left">MSSV</th>
+                            <th class="px-4 py-3 text-left">Họ Tên</th>
+                            <th class="px-4 py-3 text-center">Có Mặt</th>
+                            <th class="px-4 py-3 text-center">Vắng</th>
+                            <th class="px-4 py-3 text-center">Muộn</th>
+                            <th class="px-4 py-3 text-center">Tổng</th>
+                            <th class="px-4 py-3 text-center">Tỷ Lệ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            students.forEach((s, i) => {
+                const stats = getStats(s.uid);
+                const bgClass = i % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                const rateClass = stats.rate >= 80 ? 'bg-green-100 text-green-700' : 
+                                 stats.rate >= 60 ? 'bg-yellow-100 text-yellow-700' : 
+                                 'bg-red-100 text-red-700';
+
+                html += `
+                    <tr class="${bgClass}">
+                        <td class="px-4 py-3">${s.id}</td>
+                        <td class="px-4 py-3">${s.name}</td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 bg-green-100 text-green-700 rounded">${stats.present}</span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 bg-red-100 text-red-700 rounded">${stats.absent}</span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">${stats.late}</span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded">${stats.total}</span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 rounded ${rateClass}">${stats.rate}%</span>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function renderAll() {
+            if (currentView === 'attendance') renderAttendance();
+            if (currentView === 'students') renderStudents();
+            if (currentView === 'stats') renderStats();
+        }
+
+        function exportCSV() {
+            const date = document.getElementById('attendance-date').value;
+            let csv = '\uFEFFMSSV,Họ Tên,Lớp,Có Mặt,Vắng,Đi Muộn,Tổng Buổi,Tỷ Lệ (%)\n';
+            
+            students.forEach(s => {
+                const stats = getStats(s.uid);
+                csv += `${s.id},${s.name},${s.class},${stats.present},${stats.absent},${stats.late},${stats.total},${stats.rate}\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `diem-danh-${date}.csv`;
+            link.click();
+        }
+
+        // Update attendance list when date changes
+        document.getElementById('attendance-date').addEventListener('change', renderAttendance);
+    </script>
+</body>
+</html>
